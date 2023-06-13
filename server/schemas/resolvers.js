@@ -3,7 +3,7 @@ const { User, Product, Category, Order } = require('../models');
 const { signToken } = require('../utils/auth');
 /* We're using another test key copied from the Stripe documentation. Because it's only a test key, it's fine to include it directly in the JavaScript file. Once you create a real Stripe account, however, you would want to replace this with an environment variable (e.g., process.env.STRIPE_KEY). */
 const stripe = require('stripe')('sk_test_4eC39HqLyjWDarjtT1zdp7dc');
- 
+
 const resolvers = {
   Query: {
     categories: async () => {
@@ -54,7 +54,10 @@ const resolvers = {
     checkout: async (parent, args, context) => {
       const order = new Order({ products: args.products });
       const { products } = await order.populate('products').execPopulate();
-      
+      /* To parse out the referring URL */
+      /* const url = 'http://localhost:3001'; */
+      /* Let's update our url variable to a value that can determine where the request will originate from */
+      const url = new URL(context.headers.referer).origin;
       /* This loops over the products from the Order model */
       const line_items = [];
 
@@ -62,7 +65,8 @@ const resolvers = {
         // generate product id
         const product = await stripe.products.create({
           name: products[i].name,
-          description: products[i].description
+          description: products[i].description,
+          images: [`${url}/images/${products[i].image}`]
         });
 
         // generate price id using the product id
@@ -83,8 +87,8 @@ const resolvers = {
         payment_method_types: ['card'],
         line_items,
         mode: 'payment',
-        success_url: 'https://example.com/success?session_id={CHECKOUT_SESSION_ID}',
-        cancel_url: 'https://example.com/cancel'
+        success_url: `${url}/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${url}/cancel`
       });
 
       return { session: session.id };
